@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await req.json() as Partial<{
       name: string;
       facebookAdId: string;
@@ -16,7 +17,7 @@ export async function PATCH(
     }>;
 
     const ad = await prisma.ad.update({
-      where: { id: params.id },
+      where: { id },
       data: body,
     });
 
@@ -28,10 +29,11 @@ export async function PATCH(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await prisma.ad.delete({ where: { id: params.id } });
+    const { id } = await params;
+    await prisma.ad.delete({ where: { id } });
     return new NextResponse(null, { status: 204 });
   } catch {
     return NextResponse.json({ error: "Ad not found" }, { status: 404 });

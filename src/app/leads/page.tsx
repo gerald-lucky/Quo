@@ -19,9 +19,10 @@ async function getLeads(adId?: string) {
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const adId = typeof searchParams.adId === "string" ? searchParams.adId : undefined;
+  const resolvedParams = await searchParams;
+  const adId = typeof resolvedParams.adId === "string" ? resolvedParams.adId : undefined;
   const { leads, ads } = await getLeads(adId);
 
   const sentCount = leads.filter((l) => l.messageSent).length;
