@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 
 async function getLeads(adId?: string) {
@@ -17,9 +19,10 @@ async function getLeads(adId?: string) {
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: { adId?: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 }) {
-  const { leads, ads } = await getLeads(searchParams.adId);
+  const adId = typeof searchParams.adId === "string" ? searchParams.adId : undefined;
+  const { leads, ads } = await getLeads(adId);
 
   const sentCount = leads.filter((l) => l.messageSent).length;
   const failedCount = leads.filter((l) => !l.messageSent && l.messageError).length;
@@ -36,7 +39,7 @@ export default async function LeadsPage({
         <a
           href="/leads"
           className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
-            !searchParams.adId
+            !adId
               ? "bg-blue-600 text-white"
               : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
           }`}
@@ -48,7 +51,7 @@ export default async function LeadsPage({
             key={ad.id}
             href={`/leads?adId=${ad.id}`}
             className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              searchParams.adId === ad.id
+              adId === ad.id
                 ? "bg-blue-600 text-white"
                 : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
             }`}
