@@ -65,13 +65,12 @@ export function extractField(fieldData: FacebookLeadField[], fieldName: string):
  * Parse full name from lead data. Facebook may use "full_name" or "first_name"+"last_name".
  */
 export function extractName(fieldData: FacebookLeadField[]): string | undefined {
-  return (
-    extractField(fieldData, "full_name") ??
-    [extractField(fieldData, "first_name"), extractField(fieldData, "last_name")]
-      .filter(Boolean)
-      .join(" ") ||
-    undefined
-  );
+  const fullName = extractField(fieldData, "full_name");
+  if (fullName) return fullName;
+  const joined = [extractField(fieldData, "first_name"), extractField(fieldData, "last_name")]
+    .filter(Boolean)
+    .join(" ");
+  return joined || undefined;
 }
 
 /**
