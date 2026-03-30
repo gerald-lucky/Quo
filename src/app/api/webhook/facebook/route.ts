@@ -164,7 +164,7 @@ async function processLeadEvents(payload: FacebookWebhookPayload) {
           messageSent,
           messageSentAt,
           messageError,
-          rawData: leadData as unknown as Record<string, unknown>,
+          rawData: JSON.parse(JSON.stringify(leadData)),
         },
       });
     }
