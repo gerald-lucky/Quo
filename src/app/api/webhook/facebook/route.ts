@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchLeadData, extractField, extractName, verifyWebhookSignature } from "@/lib/facebook";
 import { sendSMS } from "@/lib/quo";
+import { generateQualifyingMessage, type QualifyingParams } from "@/lib/claude";
 
 /**
  * GET /api/webhook/facebook
@@ -125,12 +126,21 @@ async function processLeadEvents(payload: FacebookWebhookPayload) {
         extractField(leadData.field_data, "phone_number") ??
         extractField(leadData.field_data, "phone");
 
-      // Personalize the message template
-      const message = ad.messageTemplate
-        .replace(/\{\{name\}\}/gi, name ?? "there")
-        .replace(/\{\{email\}\}/gi, email ?? "")
-        .replace(/\{\{ad\}\}/gi, ad.name)
-        .replace(/\{\{campaign\}\}/gi, ad.campaignName ?? "");
+      // Generate AI qualifying message via Claude
+      let message: string;
+      try {
+        message = await generateQualifyingMessage({
+          name,
+          adName: ad.name,
+          campaignName: ad.campaignName ?? undefined,
+          businessContext: ad.businessContext ?? undefined,
+          qualifyingParams: (ad.qualifyingParams as QualifyingParams) ?? undefined,
+        });
+        console.log(`[Webhook] Claude generated message for lead ${leadgen_id}`);
+      } catch (err) {
+        console.error(`[Webhook] Claude message generation failed:`, err);
+        message = `Hi ${name ?? "there"}, thanks for your interest! We'll be in touch shortly.`;
+      }
 
       // Send SMS via Quo
       let messageSent = false;
@@ -164,6 +174,7 @@ async function processLeadEvents(payload: FacebookWebhookPayload) {
           messageSent,
           messageSentAt,
           messageError,
+          sentMessage: message,
           rawData: JSON.parse(JSON.stringify(leadData)),
         },
       });

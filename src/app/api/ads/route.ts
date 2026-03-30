@@ -19,14 +19,15 @@ export async function POST(req: NextRequest) {
       facebookAdId?: string;
       facebookPageId?: string;
       campaignName?: string;
-      messageTemplate: string;
+      businessContext?: string;
+      qualifyingParams?: Record<string, unknown>;
     };
 
-    const { name, facebookFormId, facebookAdId, facebookPageId, campaignName, messageTemplate } = body;
+    const { name, facebookFormId, facebookAdId, facebookPageId, campaignName, businessContext, qualifyingParams } = body;
 
-    if (!name || !facebookFormId || !messageTemplate) {
+    if (!name || !facebookFormId) {
       return NextResponse.json(
-        { error: "name, facebookFormId, and messageTemplate are required." },
+        { error: "name and facebookFormId are required." },
         { status: 400 }
       );
     }
@@ -38,7 +39,8 @@ export async function POST(req: NextRequest) {
         facebookAdId: facebookAdId ?? null,
         facebookPageId: facebookPageId ?? null,
         campaignName: campaignName ?? null,
-        messageTemplate,
+        businessContext: businessContext ?? null,
+        qualifyingParams: qualifyingParams ? JSON.parse(JSON.stringify(qualifyingParams)) : undefined,
       },
     });
 

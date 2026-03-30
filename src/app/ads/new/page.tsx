@@ -4,18 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-const TEMPLATE_VARS = ["{{name}}", "{{ad}}", "{{campaign}}"];
-
-const EXAMPLE_TEMPLATES = [
-  "Hi {{name}}, thanks for your interest! We received your request from our {{ad}} campaign. We'll be in touch shortly.",
-  "Hey {{name}}! Thanks for filling out our form. A member of our team will contact you within 24 hours.",
-  "Hello {{name}}! We got your info from {{ad}}. Expect a call from us soon!",
-];
-
 export default function NewAdPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [customQuestion, setCustomQuestion] = useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -23,17 +16,48 @@ export default function NewAdPage() {
     facebookAdId: "",
     facebookPageId: "",
     campaignName: "",
-    messageTemplate: EXAMPLE_TEMPLATES[0],
+    businessContext: "",
+    // qualifying params
+    monthlyBudget: false,
+    moveInDate: false,
+    rentOrBuy: false,
+    customQuestions: [] as string[],
   });
 
-  function set(field: string, value: string) {
+  function set(field: string, value: string | boolean) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function addCustomQuestion() {
+    const q = customQuestion.trim();
+    if (!q) return;
+    setForm((f) => ({ ...f, customQuestions: [...f.customQuestions, q] }));
+    setCustomQuestion("");
+  }
+
+  function removeCustomQuestion(i: number) {
+    setForm((f) => ({
+      ...f,
+      customQuestions: f.customQuestions.filter((_, idx) => idx !== i),
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    const hasQualifier =
+      form.monthlyBudget ||
+      form.moveInDate ||
+      form.rentOrBuy ||
+      form.customQuestions.length > 0;
+
+    if (!hasQualifier) {
+      setError("Add at least one qualifying parameter so the AI knows what to ask.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/ads", {
@@ -45,7 +69,13 @@ export default function NewAdPage() {
           facebookAdId: form.facebookAdId || undefined,
           facebookPageId: form.facebookPageId || undefined,
           campaignName: form.campaignName || undefined,
-          messageTemplate: form.messageTemplate,
+          businessContext: form.businessContext || undefined,
+          qualifyingParams: {
+            monthlyBudget: form.monthlyBudget,
+            moveInDate: form.moveInDate,
+            rentOrBuy: form.rentOrBuy,
+            customQuestions: form.customQuestions,
+          },
         }),
       });
 
@@ -66,10 +96,7 @@ export default function NewAdPage() {
   return (
     <div className="max-w-2xl">
       <div className="mb-8 flex items-center gap-3">
-        <Link
-          href="/ads"
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-        >
+        <Link href="/ads" className="text-gray-400 hover:text-gray-600 transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -77,7 +104,7 @@ export default function NewAdPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Register Ad</h1>
           <p className="text-gray-500 mt-0.5 text-sm">
-            Connect a Facebook Lead Ad form to automatically send SMS via Quo.
+            Claude AI will generate a personalized qualifying message for each lead.
           </p>
         </div>
       </div>
@@ -94,12 +121,11 @@ export default function NewAdPage() {
             <input
               type="text"
               required
-              placeholder="e.g. Summer Sale 2024"
+              placeholder="e.g. Miami Apartments Q2"
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-gray-400 mt-1">A friendly name to identify this ad in your dashboard.</p>
           </div>
 
           <div>
@@ -108,10 +134,10 @@ export default function NewAdPage() {
             </label>
             <input
               type="text"
-              placeholder="e.g. Q1 Lead Gen"
+              placeholder="e.g. Q2 Lead Gen"
               value={form.campaignName}
               onChange={(e) => set("campaignName", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </section>
@@ -120,9 +146,7 @@ export default function NewAdPage() {
         <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
           <div>
             <h2 className="font-semibold text-gray-900">Facebook IDs</h2>
-            <p className="text-xs text-gray-400 mt-1">
-              Find these in Meta Business Suite &rarr; Ads Manager or your Lead Form settings.
-            </p>
+            <p className="text-xs text-gray-400 mt-1">Found in Meta Business Suite → Ads Manager → your Lead Form.</p>
           </div>
 
           <div>
@@ -135,90 +159,139 @@ export default function NewAdPage() {
               placeholder="e.g. 1234567890123456"
               value={form.facebookFormId}
               onChange={(e) => set("facebookFormId", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-gray-400 mt-1">
-              The ID of the Lead Ad form. This is how the webhook links incoming leads to this ad.
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ad ID <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ad ID <span className="text-gray-400 font-normal">(optional)</span></label>
               <input
                 type="text"
                 placeholder="e.g. 1234567890"
                 value={form.facebookAdId}
                 onChange={(e) => set("facebookAdId", e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Page ID <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Page ID <span className="text-gray-400 font-normal">(optional)</span></label>
               <input
                 type="text"
                 placeholder="e.g. 9876543210"
                 value={form.facebookPageId}
                 onChange={(e) => set("facebookPageId", e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
         </section>
 
-        {/* Message Template */}
+        {/* Business Context */}
         <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
           <div>
-            <h2 className="font-semibold text-gray-900">SMS Message Template</h2>
+            <h2 className="font-semibold text-gray-900">Business Context</h2>
             <p className="text-xs text-gray-400 mt-1">
-              This message will be sent to every lead via Quo. Use variables to personalize it.
+              Tell the AI what your business does so it can craft a relevant message.
+            </p>
+          </div>
+          <textarea
+            rows={3}
+            placeholder="e.g. We help people find rental apartments in Miami. We offer furnished and unfurnished units from $1,500/month."
+            value={form.businessContext}
+            onChange={(e) => set("businessContext", e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
+        </section>
+
+        {/* Qualifying Parameters */}
+        <section className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-900">Qualifying Parameters</h2>
+            <p className="text-xs text-gray-400 mt-1">
+              The AI will pick one of these to ask the lead. Select all that apply to this ad.
             </p>
           </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              {TEMPLATE_VARS.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => set("messageTemplate", form.messageTemplate + v)}
-                  className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded font-mono hover:bg-blue-100 transition-colors"
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-            <textarea
-              required
-              rows={4}
-              value={form.messageTemplate}
-              onChange={(e) => set("messageTemplate", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              placeholder="Type your message..."
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              {form.messageTemplate.length} characters &middot; Click a variable above to insert it.
-            </p>
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.monthlyBudget}
+                onChange={(e) => set("monthlyBudget", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <p className="text-sm font-medium text-gray-800">Monthly Budget</p>
+                <p className="text-xs text-gray-400">Ask the lead what their monthly budget is</p>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.moveInDate}
+                onChange={(e) => set("moveInDate", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <p className="text-sm font-medium text-gray-800">Expected Move-in Date</p>
+                <p className="text-xs text-gray-400">Ask when they are expecting to move</p>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.rentOrBuy}
+                onChange={(e) => set("rentOrBuy", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <p className="text-sm font-medium text-gray-800">Rent or Buy</p>
+                <p className="text-xs text-gray-400">Ask whether they want to rent or buy</p>
+              </div>
+            </label>
           </div>
 
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-2">Quick templates:</p>
-            <div className="space-y-2">
-              {EXAMPLE_TEMPLATES.map((t, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => set("messageTemplate", t)}
-                  className="w-full text-left text-xs bg-gray-50 hover:bg-gray-100 text-gray-600 px-3 py-2 rounded-lg transition-colors"
-                >
-                  {t}
-                </button>
-              ))}
+          {/* Custom questions */}
+          <div className="pt-2 border-t border-gray-100">
+            <p className="text-sm font-medium text-gray-700 mb-2">Custom Qualifying Questions</p>
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                placeholder="e.g. How many bedrooms do you need?"
+                value={customQuestion}
+                onChange={(e) => setCustomQuestion(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomQuestion())}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={addCustomQuestion}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+              >
+                Add
+              </button>
             </div>
+            {form.customQuestions.length > 0 && (
+              <div className="space-y-2">
+                {form.customQuestions.map((q, i) => (
+                  <div key={i} className="flex items-center justify-between bg-blue-50 px-3 py-2 rounded-lg">
+                    <span className="text-sm text-blue-800">{q}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomQuestion(i)}
+                      className="text-blue-400 hover:text-red-500 transition-colors ml-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -236,10 +309,7 @@ export default function NewAdPage() {
           >
             {loading ? "Saving..." : "Register Ad"}
           </button>
-          <Link
-            href="/ads"
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-          >
+          <Link href="/ads" className="text-sm text-gray-500 hover:text-gray-700 transition-colors">
             Cancel
           </Link>
         </div>

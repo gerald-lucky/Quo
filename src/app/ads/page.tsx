@@ -112,9 +112,24 @@ export default async function AdsPage() {
                     </span>
                   </div>
 
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600 italic">
-                    &ldquo;{ad.messageTemplate}&rdquo;
-                  </div>
+                  {ad.businessContext && (
+                    <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-500 mb-2">
+                      <span className="font-medium">Context:</span> {ad.businessContext}
+                    </div>
+                  )}
+                  {ad.qualifyingParams && (() => {
+                    const qp = ad.qualifyingParams as { monthlyBudget?: boolean; moveInDate?: boolean; rentOrBuy?: boolean; customQuestions?: string[] };
+                    return (
+                      <div className="flex flex-wrap gap-1">
+                        {qp.monthlyBudget && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Monthly Budget</span>}
+                        {qp.moveInDate && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Move-in Date</span>}
+                        {qp.rentOrBuy && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Rent or Buy</span>}
+                        {(qp.customQuestions ?? []).map((q, i) => (
+                          <span key={i} className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{q}</span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">

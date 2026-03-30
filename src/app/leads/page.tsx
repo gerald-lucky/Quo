@@ -36,13 +36,11 @@ export default async function LeadsPage({
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 flex items-center gap-3 flex-wrap">
         <a
           href="/leads"
           className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
-            !adId
-              ? "bg-blue-600 text-white"
-              : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            !adId ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
           }`}
         >
           All Ads
@@ -52,9 +50,7 @@ export default async function LeadsPage({
             key={ad.id}
             href={`/leads?adId=${ad.id}`}
             className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              adId === ad.id
-                ? "bg-blue-600 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+              adId === ad.id ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
             }`}
           >
             {ad.name}
@@ -64,15 +60,9 @@ export default async function LeadsPage({
 
       {/* Summary */}
       <div className="flex items-center gap-4 mb-6 text-sm text-gray-500">
-        <span>
-          <strong className="text-gray-900">{leads.length}</strong> leads
-        </span>
-        <span className="text-green-600">
-          <strong>{sentCount}</strong> SMS sent
-        </span>
-        <span className="text-red-500">
-          <strong>{failedCount}</strong> failed
-        </span>
+        <span><strong className="text-gray-900">{leads.length}</strong> leads</span>
+        <span className="text-green-600"><strong>{sentCount}</strong> SMS sent</span>
+        <span className="text-red-500"><strong>{failedCount}</strong> failed</span>
       </div>
 
       {/* Table */}
@@ -86,24 +76,12 @@ export default async function LeadsPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Name
-                  </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Phone
-                  </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Email
-                  </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Ad / Campaign
-                  </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    SMS
-                  </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Date
-                  </th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ad / Campaign</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Message Sent</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SMS Status</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -111,19 +89,24 @@ export default async function LeadsPage({
                   <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3 font-medium text-gray-900">
                       {lead.name ?? <span className="text-gray-400">—</span>}
+                      {lead.email && <p className="text-xs text-gray-400 font-normal">{lead.email}</p>}
                     </td>
                     <td className="px-5 py-3 text-gray-600 font-mono text-xs">
                       {lead.phone ?? <span className="text-gray-400">—</span>}
                     </td>
-                    <td className="px-5 py-3 text-gray-600 text-xs">
-                      {lead.email ?? <span className="text-gray-400">—</span>}
-                    </td>
                     <td className="px-5 py-3">
                       <span className="font-medium text-gray-800">{lead.ad.name}</span>
                       {lead.ad.campaignName && (
-                        <span className="text-gray-400 text-xs ml-1">
-                          / {lead.ad.campaignName}
-                        </span>
+                        <span className="text-gray-400 text-xs ml-1">/ {lead.ad.campaignName}</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 max-w-xs">
+                      {lead.sentMessage ? (
+                        <p className="text-xs text-gray-600 italic line-clamp-2" title={lead.sentMessage}>
+                          &ldquo;{lead.sentMessage}&rdquo;
+                        </p>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
                       )}
                     </td>
                     <td className="px-5 py-3">
@@ -135,10 +118,7 @@ export default async function LeadsPage({
                           Sent
                         </span>
                       ) : lead.messageError ? (
-                        <span
-                          className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-medium cursor-help"
-                          title={lead.messageError}
-                        >
+                        <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-medium cursor-help" title={lead.messageError}>
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                           </svg>
@@ -150,11 +130,8 @@ export default async function LeadsPage({
                     </td>
                     <td className="px-5 py-3 text-gray-400 text-xs">
                       {new Date(lead.createdAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
+                        month: "short", day: "numeric", year: "numeric",
+                        hour: "2-digit", minute: "2-digit",
                       })}
                     </td>
                   </tr>
