@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 
 async function getLeads(adId?: string) {
   const where = adId ? { adId } : {};
@@ -88,7 +89,9 @@ export default async function LeadsPage({
                 {leads.map((lead) => (
                   <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3 font-medium text-gray-900">
-                      {lead.name ?? <span className="text-gray-400">—</span>}
+                      <Link href={`/leads/${lead.id}`} className="hover:text-blue-600 transition-colors">
+                        {lead.name ?? <span className="text-gray-400">—</span>}
+                      </Link>
                       {lead.email && <p className="text-xs text-gray-400 font-normal">{lead.email}</p>}
                     </td>
                     <td className="px-5 py-3 text-gray-600 font-mono text-xs">

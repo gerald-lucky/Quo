@@ -17,21 +17,30 @@ export interface LeadContext {
   qualifyingParams?: QualifyingParams;
 }
 
-export async function generateQualifyingMessage(lead: LeadContext): Promise<string> {
-  const qualifiers: string[] = [];
+export interface ConversationMessage {
+  role: "assistant" | "user";
+  content: string;
+}
 
-  if (lead.qualifyingParams?.monthlyBudget) {
-    qualifiers.push("their monthly budget");
-  }
-  if (lead.qualifyingParams?.moveInDate) {
-    qualifiers.push("when they are expecting to move");
-  }
-  if (lead.qualifyingParams?.rentOrBuy) {
-    qualifiers.push("whether they want to rent or buy");
-  }
-  if (lead.qualifyingParams?.customQuestions?.length) {
-    qualifiers.push(...lead.qualifyingParams.customQuestions);
-  }
+export interface FollowUpResult {
+  message: string;
+  qualificationStatus: "pending" | "qualified" | "not_qualified";
+}
+
+function buildQualifierList(params?: QualifyingParams): string[] {
+  const qualifiers: string[] = [];
+  if (params?.monthlyBudget) qualifiers.push("monthly budget");
+  if (params?.moveInDate) qualifiers.push("expected move-in date");
+  if (params?.rentOrBuy) qualifiers.push("whether they want to rent or buy");
+  if (params?.customQuestions?.length) qualifiers.push(...params.customQuestions);
+  return qualifiers;
+}
+
+/**
+ * Generate the first qualifying message sent to a new lead.
+ */
+export async function generateQualifyingMessage(lead: LeadContext): Promise<string> {
+  const qualifiers = buildQualifierList(lead.qualifyingParams);
 
   const qualifierText =
     qualifiers.length > 0
@@ -61,9 +70,64 @@ Reply with ONLY the SMS message text, nothing else.`;
   });
 
   const content = response.content[0];
-  if (content.type !== "text") {
-    throw new Error("Unexpected response type from Claude");
+  if (content.type !== "text") throw new Error("Unexpected response type from Claude");
+  return content.text.trim();
+}
+
+/**
+ * Generate a follow-up reply based on the full conversation history.
+ * Returns the next message and whether the lead is now qualified.
+ */
+export async function generateFollowUp(
+  lead: LeadContext,
+  history: ConversationMessage[]
+): Promise<FollowUpResult> {
+  const qualifiers = buildQualifierList(lead.qualifyingParams);
+
+  const systemPrompt = `You are a friendly sales assistant qualifying leads via SMS for a business.
+
+Business context: ${lead.businessContext ?? "A business looking for qualified leads."}
+Ad: ${lead.adName}
+Lead name: ${lead.name ?? "the lead"}
+
+Qualifying information you need to collect:
+${qualifiers.map((q, i) => `${i + 1}. ${q}`).join("\n")}
+
+Rules:
+- Ask ONE question at a time
+- Be friendly, brief, and conversational
+- Keep messages under 320 characters
+- Once you have collected all qualifying info, send a warm closing message and end with exactly: [QUALIFIED]
+- If the lead is clearly not a good fit (e.g. budget too low, not interested), end with exactly: [NOT_QUALIFIED]
+- Otherwise just reply naturally and continue collecting info
+
+Reply with ONLY the SMS message text (and optionally [QUALIFIED] or [NOT_QUALIFIED] at the very end).`;
+
+  const messages = history.map((m) => ({
+    role: m.role as "user" | "assistant",
+    content: m.content,
+  }));
+
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 200,
+    system: systemPrompt,
+    messages,
+  });
+
+  const content = response.content[0];
+  if (content.type !== "text") throw new Error("Unexpected response type from Claude");
+
+  let text = content.text.trim();
+  let qualificationStatus: FollowUpResult["qualificationStatus"] = "pending";
+
+  if (text.includes("[QUALIFIED]")) {
+    qualificationStatus = "qualified";
+    text = text.replace("[QUALIFIED]", "").trim();
+  } else if (text.includes("[NOT_QUALIFIED]")) {
+    qualificationStatus = "not_qualified";
+    text = text.replace("[NOT_QUALIFIED]", "").trim();
   }
 
-  return content.text.trim();
+  return { message: text, qualificationStatus };
 }

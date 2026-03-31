@@ -26,20 +26,32 @@ model Ad {
 }
 
 model Lead {
-  id               String    @id @default(cuid())
-  facebookLeadId   String    @unique
-  adId             String
-  ad               Ad        @relation(fields: [adId], references: [id])
-  name             String?
-  email            String?
-  phone            String?
-  messageSent      Boolean   @default(false)
-  messageSentAt    DateTime?
-  messageError     String?
-  sentMessage      String?
-  qualificationStatus String? @default("pending")
-  rawData          Json?
-  createdAt        DateTime  @default(now())
+  id                  String    @id @default(cuid())
+  facebookLeadId      String    @unique
+  adId                String
+  ad                  Ad        @relation(fields: [adId], references: [id])
+  name                String?
+  email               String?
+  phone               String?
+  messageSent         Boolean   @default(false)
+  messageSentAt       DateTime?
+  messageError        String?
+  sentMessage         String?
+  qualificationStatus String?   @default("pending")
+  rawData             Json?
+  createdAt           DateTime  @default(now())
+  messages            Message[]
 
   @@map("leads")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id])
+  role      String   // "assistant" or "user"
+  content   String
+  createdAt DateTime @default(now())
+
+  @@map("messages")
 }
