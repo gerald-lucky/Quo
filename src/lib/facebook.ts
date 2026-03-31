@@ -1,4 +1,39 @@
 /**
+ * Normalize a phone number to E.164 format with +1 country code (US).
+ * Handles Facebook exports which may include "p:" prefix, spaces, dashes, etc.
+ */
+export function normalizePhone(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+
+  // Strip Facebook's "p:" prefix and any whitespace
+  let digits = raw.replace(/^p:/i, "").replace(/\s/g, "");
+
+  // Remove all non-numeric characters except leading +
+  const hasPlus = digits.startsWith("+");
+  digits = digits.replace(/\D/g, "");
+
+  if (!digits) return undefined;
+
+  // Already has country code (11 digits starting with 1)
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+${digits}`;
+  }
+
+  // 10-digit US number — add +1
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  // Has + prefix and reasonable length — trust it
+  if (hasPlus && digits.length >= 10) {
+    return `+${digits}`;
+  }
+
+  // Fallback: prepend +1 and hope for the best
+  return `+1${digits}`;
+}
+
+/**
  * Facebook Graph API helpers for Lead Ads
  *
  * Configure these environment variables:

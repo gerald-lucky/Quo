@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendSMS } from "@/lib/quo";
 import { generateQualifyingMessage, type QualifyingParams } from "@/lib/claude";
+import { normalizePhone } from "@/lib/facebook";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest) {
 
     for (const row of leads) {
       if (!row.phone) continue;
+
+      // Normalize phone to E.164 (+1XXXXXXXXXX)
+      row.phone = normalizePhone(row.phone) ?? row.phone;
 
       // Generate AI message
       let message: string;

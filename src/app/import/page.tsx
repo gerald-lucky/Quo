@@ -17,23 +17,43 @@ interface ImportResult {
   error?: string;
 }
 
+function normalizePhone(raw: string): string {
+  let digits = raw.replace(/^p:/i, "").replace(/\s/g, "");
+  const hasPlus = digits.startsWith("+");
+  digits = digits.replace(/\D/g, "");
+  if (!digits) return raw;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  if (hasPlus && digits.length >= 10) return `+${digits}`;
+  return `+1${digits}`;
+}
+
 function parseCSV(text: string): ParsedLead[] {
   const lines = text.trim().split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/[^a-z]/g, ""));
-  const nameIdx = headers.findIndex((h) => h.includes("name"));
-  const phoneIdx = headers.findIndex((h) => h.includes("phone") || h.includes("mobile"));
-  const emailIdx = headers.findIndex((h) => h.includes("email"));
+  // Support both quoted and unquoted CSV headers
+  const rawHeaders = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+  const headers = rawHeaders.map((h) => h.toLowerCase().replace(/[^a-z]/g, ""));
+
+  // Accept Facebook export column names (FULL_NAME, EMAIL, PHONE) and generic names
+  const nameIdx = headers.findIndex((h) => h === "fullname" || h.includes("name"));
+  const phoneIdx = headers.findIndex((h) => h === "phone" || h.includes("phone") || h.includes("mobile"));
+  const emailIdx = headers.findIndex((h) => h === "email" || h.includes("email"));
 
   if (phoneIdx === -1) return [];
 
   return lines.slice(1).map((line) => {
-    const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    // Handle quoted fields that may contain commas
+    const cols = line.match(/("([^"]*)"|[^,]*)/g)?.map((c) =>
+      c.trim().replace(/^"|"$/g, "")
+    ) ?? line.split(",").map((c) => c.trim());
+
+    const rawPhone = cols[phoneIdx] ?? "";
     return {
-      name: nameIdx >= 0 ? cols[nameIdx] : undefined,
-      phone: cols[phoneIdx],
-      email: emailIdx >= 0 ? cols[emailIdx] : undefined,
+      name: nameIdx >= 0 ? (cols[nameIdx] || undefined) : undefined,
+      phone: rawPhone ? normalizePhone(rawPhone) : rawPhone,
+      email: emailIdx >= 0 ? (cols[emailIdx] || undefined) : undefined,
     };
   }).filter((r) => r.phone);
 }
@@ -120,9 +140,8 @@ export default function ImportPage() {
       <div className="space-y-6">
         {/* Instructions */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-          <p className="font-medium mb-1">CSV format required:</p>
-          <p>Your sheet must have columns named <code className="bg-blue-100 px-1 rounded">name</code>, <code className="bg-blue-100 px-1 rounded">phone</code>, and optionally <code className="bg-blue-100 px-1 rounded">email</code>.</p>
-          <p className="mt-1 text-blue-600">In Google Sheets: File → Download → CSV</p>
+          <p className="font-medium mb-1">CSV format:</p>
+          <p>Accepts Facebook Lead Ads exports directly (<code className="bg-blue-100 px-1 rounded">FULL_NAME</code>, <code className="bg-blue-100 px-1 rounded">PHONE</code>, <code className="bg-blue-100 px-1 rounded">EMAIL</code>) or generic columns (<code className="bg-blue-100 px-1 rounded">name</code>, <code className="bg-blue-100 px-1 rounded">phone</code>). Phone numbers are automatically formatted to +1.</p>
         </div>
 
         {/* Select Ad */}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchLeadData, extractField, extractName, verifyWebhookSignature } from "@/lib/facebook";
+import { fetchLeadData, extractField, extractName, verifyWebhookSignature, normalizePhone } from "@/lib/facebook";
 import { sendSMS } from "@/lib/quo";
 import { generateQualifyingMessage, type QualifyingParams } from "@/lib/claude";
 
@@ -122,9 +122,10 @@ async function processLeadEvents(payload: FacebookWebhookPayload) {
 
       const name = extractName(leadData.field_data);
       const email = extractField(leadData.field_data, "email");
-      const phone =
+      const rawPhone =
         extractField(leadData.field_data, "phone_number") ??
         extractField(leadData.field_data, "phone");
+      const phone = normalizePhone(rawPhone);
 
       // Generate AI qualifying message via Claude
       let message: string;
