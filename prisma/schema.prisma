@@ -38,6 +38,7 @@ model Lead {
   messageError        String?
   sentMessage         String?
   qualificationStatus String?   @default("pending")
+  followUpCount       Int       @default(0)
   callbackTime        String?
   asanaTaskId         String?
   rawData             Json?

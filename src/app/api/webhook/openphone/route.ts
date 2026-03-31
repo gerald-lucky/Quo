@@ -55,9 +55,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Save the inbound message
+    // Save the inbound message and reset follow-up counter (lead is active again)
     await prisma.message.create({
       data: { leadId: lead.id, role: "user", content: inboundText },
+    });
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { followUpCount: 0 },
     });
 
     // Build conversation history for Claude

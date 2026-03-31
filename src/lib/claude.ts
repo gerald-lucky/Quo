@@ -172,6 +172,42 @@ Reply with ONLY the SMS message text.`;
 }
 
 /**
+ * Generate a follow-up nudge when a lead hasn't responded.
+ * followUpNumber: 1, 2, or 3
+ */
+export async function generateFollowUpNudge(
+  lead: LeadContext,
+  followUpNumber: number
+): Promise<string> {
+  const tone =
+    followUpNumber === 1
+      ? "a gentle, friendly check-in"
+      : followUpNumber === 2
+      ? "a slightly more direct but still warm nudge"
+      : "a final, brief message letting them know you'll stop reaching out";
+
+  const prompt = `You are Gerald from Lucky Communities. You sent a lead a message a while ago and haven't heard back. This is follow-up number ${followUpNumber} of 3.
+
+Lead name: ${lead.name ?? "there"}
+Ad: ${lead.adName}
+${lead.businessContext ? `Business context: ${lead.businessContext}` : ""}
+
+Write ${tone} as a short SMS. Keep it under 160 characters. Be genuine — not pushy. Sign off as Gerald.${followUpNumber === 3 ? " Make it clear this is your last follow-up." : ""}
+
+Reply with ONLY the SMS message text.`;
+
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 100,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const content = response.content[0];
+  if (content.type !== "text") throw new Error("Unexpected response type from Claude");
+  return content.text.trim();
+}
+
+/**
  * Parse a callback time from the lead's reply and confirm the appointment.
  */
 async function parseCallbackTime(
