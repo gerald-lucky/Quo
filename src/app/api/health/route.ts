@@ -12,17 +12,10 @@ export async function GET() {
   }
 
   try {
-    await prisma.ad.count();
-    results.ads_table = "ok";
+    await prisma.ad.findFirst({ select: { businessContext: true, qualifyingParams: true } });
+    results.ads_new_columns = "ok";
   } catch (e) {
-    results.ads_table = String(e);
-  }
-
-  try {
-    await prisma.lead.count();
-    results.leads_table = "ok";
-  } catch (e) {
-    results.leads_table = String(e);
+    results.ads_new_columns = String(e);
   }
 
   try {
@@ -30,6 +23,13 @@ export async function GET() {
     results.sentMessage_column = "ok";
   } catch (e) {
     results.sentMessage_column = String(e);
+  }
+
+  try {
+    await prisma.lead.findFirst({ select: { qualificationStatus: true } });
+    results.qualificationStatus_column = "ok";
+  } catch (e) {
+    results.qualificationStatus_column = String(e);
   }
 
   return NextResponse.json(results);
