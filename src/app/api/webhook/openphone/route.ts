@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendSMS } from "@/lib/quo";
-import { generateFollowUp, type QualifyingParams, type ConversationMessage } from "@/lib/claude";
+import { generateFollowUp, type QualifyingParams, type ConversationMessage, type QualificationStatus } from "@/lib/claude";
+import { createCallbackTask } from "@/lib/asana";
 
 /**
  * POST /api/webhook/openphone
@@ -46,9 +47,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Skip if already fully qualified
-    if (lead.qualificationStatus === "qualified" || lead.qualificationStatus === "not_qualified") {
-      console.log(`[OpenPhone] Lead ${lead.id} already ${lead.qualificationStatus}. Skipping.`);
+    const currentStatus = (lead.qualificationStatus ?? "pending") as QualificationStatus;
+
+    // Skip if already fully resolved
+    if (currentStatus === "not_qualified" || currentStatus === "qualified") {
+      console.log(`[OpenPhone] Lead ${lead.id} already ${currentStatus}. Skipping.`);
       return NextResponse.json({ ok: true });
     }
 
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
     ];
 
     // Generate follow-up via Claude
-    const { message: replyText, qualificationStatus } = await generateFollowUp(
+    const { message: replyText, qualificationStatus, callbackTime } = await generateFollowUp(
       {
         name: lead.name ?? undefined,
         adName: lead.ad.name,
@@ -74,7 +77,8 @@ export async function POST(req: NextRequest) {
         businessContext: lead.ad.businessContext ?? undefined,
         qualifyingParams: (lead.ad.qualifyingParams as QualifyingParams) ?? undefined,
       },
-      history
+      history,
+      currentStatus
     );
 
     // Send reply via OpenPhone
@@ -86,11 +90,36 @@ export async function POST(req: NextRequest) {
       data: { leadId: lead.id, role: "assistant", content: replyText },
     });
 
-    // Update lead qualification status
+    // Prepare lead update
+    const leadUpdate: Record<string, unknown> = { qualificationStatus };
+    if (callbackTime) {
+      leadUpdate.callbackTime = callbackTime;
+    }
+
     await prisma.lead.update({
       where: { id: lead.id },
-      data: { qualificationStatus },
+      data: leadUpdate,
     });
+
+    // If lead is now qualified and we have a callback time, create Asana task
+    if (qualificationStatus === "qualified" && callbackTime) {
+      const asanaResult = await createCallbackTask({
+        leadName: lead.name ?? "Unknown",
+        phone: phone,
+        callbackTime,
+        adName: lead.ad.name,
+      });
+
+      if (asanaResult.success && asanaResult.taskId) {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { asanaTaskId: asanaResult.taskId },
+        });
+        console.log(`[OpenPhone] Asana task created for ${lead.name}: ${asanaResult.taskUrl}`);
+      } else {
+        console.error(`[OpenPhone] Asana task failed for ${lead.name}: ${asanaResult.error}`);
+      }
+    }
 
     if (result.success) {
       console.log(`[OpenPhone] Follow-up sent to ${phone}. Status: ${qualificationStatus}`);

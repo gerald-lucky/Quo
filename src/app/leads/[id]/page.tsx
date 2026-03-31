@@ -32,6 +32,7 @@ export default async function LeadDetailPage({
     qualified: "bg-green-50 text-green-700",
     not_qualified: "bg-red-50 text-red-600",
     pending: "bg-yellow-50 text-yellow-700",
+    awaiting_callback: "bg-blue-50 text-blue-700",
   }[lead.qualificationStatus ?? "pending"] ?? "bg-gray-100 text-gray-500";
 
   return (
@@ -46,13 +47,28 @@ export default async function LeadDetailPage({
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-gray-900">{lead.name ?? "Unknown"}</h1>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor}`}>
-              {lead.qualificationStatus ?? "pending"}
+              {lead.qualificationStatus === "awaiting_callback" ? "awaiting callback" : (lead.qualificationStatus ?? "pending")}
             </span>
           </div>
           <p className="text-sm text-gray-400">
             {lead.phone} · {lead.ad.name}
             {lead.email && ` · ${lead.email}`}
           </p>
+          {lead.callbackTime && (
+            <p className="text-sm text-blue-600 mt-1">
+              Callback: {lead.callbackTime}
+              {lead.asanaTaskId && (
+                <a
+                  href={`https://app.asana.com/search?q=${encodeURIComponent(lead.name ?? "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2 text-xs text-purple-600 hover:underline"
+                >
+                  View in Asana
+                </a>
+              )}
+            </p>
+          )}
         </div>
       </div>
 

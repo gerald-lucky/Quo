@@ -38,6 +38,8 @@ model Lead {
   messageError        String?
   sentMessage         String?
   qualificationStatus String?   @default("pending")
+  callbackTime        String?
+  asanaTaskId         String?
   rawData             Json?
   createdAt           DateTime  @default(now())
   messages            Message[]
