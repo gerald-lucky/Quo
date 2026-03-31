@@ -1,11 +1,10 @@
 /**
- * Quo SMS API Integration
+ * OpenPhone SMS Integration
  *
  * Configure these environment variables:
- *   QUO_API_URL   - Base URL of the Quo API (e.g. https://api.quo.com/v1)
- *   QUO_API_KEY   - Your Quo API key
- *
- * Adjust the request shape below once you have Quo's API documentation.
+ *   QUO_API_URL        - https://api.openphone.com/v1
+ *   QUO_API_KEY        - Your OpenPhone API key
+ *   OPENPHONE_FROM     - Your OpenPhone phone number (e.g. +12345678901)
  */
 
 export interface QuoSendResult {
@@ -17,13 +16,19 @@ export interface QuoSendResult {
 export async function sendSMS(to: string, message: string): Promise<QuoSendResult> {
   const apiUrl = process.env.QUO_API_URL;
   const apiKey = process.env.QUO_API_KEY;
+  const fromNumber = process.env.OPENPHONE_FROM;
 
   if (!apiUrl || !apiKey) {
-    console.error("[Quo] QUO_API_URL or QUO_API_KEY is not configured.");
+    console.error("[OpenPhone] QUO_API_URL or QUO_API_KEY is not configured.");
     return { success: false, error: "Quo API not configured" };
   }
 
-  // Normalize phone: ensure it starts with + for E.164 format
+  if (!fromNumber) {
+    console.error("[OpenPhone] OPENPHONE_FROM is not configured.");
+    return { success: false, error: "OpenPhone sender number not configured" };
+  }
+
+  // Normalize phone to E.164 format
   const normalizedPhone = to.startsWith("+") ? to : `+${to}`;
 
   try {
@@ -31,29 +36,29 @@ export async function sendSMS(to: string, message: string): Promise<QuoSendResul
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: apiKey,
       },
       body: JSON.stringify({
-        to: normalizedPhone,
-        message,
+        content: message,
+        from: fromNumber,
+        to: [normalizedPhone],
       }),
     });
 
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMsg = (data as { error?: string; message?: string }).error
-        ?? (data as { message?: string }).message
-        ?? `HTTP ${response.status}`;
-      console.error("[Quo] SMS send failed:", errorMsg);
+      const err = data as { message?: string; error?: string };
+      const errorMsg = err.message ?? err.error ?? `HTTP ${response.status}`;
+      console.error("[OpenPhone] SMS send failed:", errorMsg);
       return { success: false, error: errorMsg };
     }
 
-    const result = data as { id?: string; messageId?: string };
-    return { success: true, messageId: result.id ?? result.messageId };
+    const result = data as { data?: { id?: string } };
+    return { success: true, messageId: result.data?.id };
   } catch (err) {
     const error = err instanceof Error ? err.message : "Unknown error";
-    console.error("[Quo] SMS send exception:", error);
+    console.error("[OpenPhone] SMS send exception:", error);
     return { success: false, error };
   }
 }
