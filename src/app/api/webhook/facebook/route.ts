@@ -86,104 +86,111 @@ interface FacebookChange {
 // ──────────────────────────────────────────────────────────────────────────────
 
 async function processLeadEvents(payload: FacebookWebhookPayload) {
-  console.log(`[Webhook] Processing payload: object=${payload.object}, entries=${payload.entry?.length}`);
+  try {
+    console.log(`[Webhook] Processing payload: object=${payload.object}, entries=${payload.entry?.length}`);
 
-  if (payload.object !== "page") {
-    console.log(`[Webhook] Skipping — object is "${payload.object}", expected "page"`);
-    return;
-  }
-
-  for (const entry of payload.entry) {
-    for (const change of entry.changes) {
-      if (change.field !== "leadgen") continue;
-
-      const { leadgen_id, form_id } = change.value;
-
-      // Find matching registered ad by form ID
-      const ad = await prisma.ad.findUnique({
-        where: { facebookFormId: form_id, isActive: true },
-      });
-
-      if (!ad) {
-        console.log(`[Webhook] No active ad found for form_id=${form_id}. Skipping.`);
-        continue;
-      }
-
-      // Avoid duplicate processing
-      const existing = await prisma.lead.findUnique({
-        where: { facebookLeadId: leadgen_id },
-      });
-      if (existing) {
-        console.log(`[Webhook] Lead ${leadgen_id} already processed.`);
-        continue;
-      }
-
-      // Fetch full lead data from Facebook
-      const leadData = await fetchLeadData(leadgen_id);
-      if (!leadData) {
-        console.error(`[Webhook] Could not fetch lead data for ${leadgen_id}`);
-        continue;
-      }
-
-      const name = extractName(leadData.field_data);
-      const email = extractField(leadData.field_data, "email");
-      const rawPhone =
-        extractField(leadData.field_data, "phone_number") ??
-        extractField(leadData.field_data, "phone");
-      const phone = normalizePhone(rawPhone);
-
-      // Generate AI qualifying message via Claude
-      let message: string;
-      try {
-        message = await generateQualifyingMessage({
-          name,
-          adName: ad.name,
-          campaignName: ad.campaignName ?? undefined,
-          businessContext: ad.businessContext ?? undefined,
-          qualifyingParams: (ad.qualifyingParams as QualifyingParams) ?? undefined,
-        });
-        console.log(`[Webhook] Claude generated message for lead ${leadgen_id}`);
-      } catch (err) {
-        console.error(`[Webhook] Claude message generation failed:`, err);
-        message = `Hi ${name ?? "there"}, thanks for your interest! We'll be in touch shortly.`;
-      }
-
-      // Send SMS via Quo
-      let messageSent = false;
-      let messageError: string | undefined;
-      let messageSentAt: Date | undefined;
-
-      if (phone) {
-        const result = await sendSMS(phone, message);
-        messageSent = result.success;
-        messageError = result.error;
-        messageSentAt = result.success ? new Date() : undefined;
-
-        if (result.success) {
-          console.log(`[Webhook] SMS sent to ${phone} for lead ${leadgen_id}`);
-        } else {
-          console.error(`[Webhook] SMS failed for ${leadgen_id}: ${result.error}`);
-        }
-      } else {
-        messageError = "No phone number in lead data";
-        console.warn(`[Webhook] No phone for lead ${leadgen_id}`);
-      }
-
-      // Persist lead
-      await prisma.lead.create({
-        data: {
-          facebookLeadId: leadgen_id,
-          adId: ad.id,
-          name,
-          email,
-          phone,
-          messageSent,
-          messageSentAt,
-          messageError,
-          sentMessage: message,
-          rawData: JSON.parse(JSON.stringify(leadData)),
-        },
-      });
+    if (payload.object !== "page") {
+      console.log(`[Webhook] Skipping — object is "${payload.object}", expected "page"`);
+      return;
     }
+
+    for (const entry of payload.entry) {
+      for (const change of entry.changes) {
+        if (change.field !== "leadgen") continue;
+
+        const { leadgen_id, form_id } = change.value;
+        console.log(`[Webhook] leadgen_id=${leadgen_id} form_id=${form_id}`);
+
+        // Find matching registered ad by form ID
+        const ad = await prisma.ad.findUnique({
+          where: { facebookFormId: form_id, isActive: true },
+        });
+
+        if (!ad) {
+          console.log(`[Webhook] No active ad found for form_id=${form_id}. Skipping.`);
+          continue;
+        }
+
+        // Avoid duplicate processing
+        const existing = await prisma.lead.findUnique({
+          where: { facebookLeadId: leadgen_id },
+        });
+        if (existing) {
+          console.log(`[Webhook] Lead ${leadgen_id} already processed.`);
+          continue;
+        }
+
+        // Fetch full lead data from Facebook
+        const leadData = await fetchLeadData(leadgen_id);
+        if (!leadData) {
+          console.error(`[Webhook] Could not fetch lead data for ${leadgen_id}`);
+          continue;
+        }
+
+        const name = extractName(leadData.field_data);
+        const email = extractField(leadData.field_data, "email");
+        const rawPhone =
+          extractField(leadData.field_data, "phone_number") ??
+          extractField(leadData.field_data, "phone");
+        const phone = normalizePhone(rawPhone);
+
+        // Generate AI qualifying message via Claude
+        let message: string;
+        try {
+          message = await generateQualifyingMessage({
+            name,
+            adName: ad.name,
+            campaignName: ad.campaignName ?? undefined,
+            businessContext: ad.businessContext ?? undefined,
+            qualifyingParams: (ad.qualifyingParams as QualifyingParams) ?? undefined,
+          });
+          console.log(`[Webhook] Claude generated message for lead ${leadgen_id}`);
+        } catch (err) {
+          console.error(`[Webhook] Claude message generation failed:`, err);
+          message = `Hi ${name ?? "there"}, thanks for your interest! We'll be in touch shortly.`;
+        }
+
+        // Send SMS via Quo
+        let messageSent = false;
+        let messageError: string | undefined;
+        let messageSentAt: Date | undefined;
+
+        if (phone) {
+          const result = await sendSMS(phone, message);
+          messageSent = result.success;
+          messageError = result.error;
+          messageSentAt = result.success ? new Date() : undefined;
+
+          if (result.success) {
+            console.log(`[Webhook] SMS sent to ${phone} for lead ${leadgen_id}`);
+          } else {
+            console.error(`[Webhook] SMS failed for ${leadgen_id}: ${result.error}`);
+          }
+        } else {
+          messageError = "No phone number in lead data";
+          console.warn(`[Webhook] No phone for lead ${leadgen_id}`);
+        }
+
+        // Persist lead
+        await prisma.lead.create({
+          data: {
+            facebookLeadId: leadgen_id,
+            adId: ad.id,
+            name,
+            email,
+            phone,
+            messageSent,
+            messageSentAt,
+            messageError,
+            sentMessage: message,
+            rawData: JSON.parse(JSON.stringify(leadData)),
+          },
+        });
+
+        console.log(`[Webhook] Lead ${leadgen_id} saved successfully.`);
+      }
+    }
+  } catch (err) {
+    console.error("[Webhook] Fatal error in processLeadEvents:", err);
   }
 }
