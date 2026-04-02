@@ -86,7 +86,12 @@ interface FacebookChange {
 // ──────────────────────────────────────────────────────────────────────────────
 
 async function processLeadEvents(payload: FacebookWebhookPayload) {
-  if (payload.object !== "page") return;
+  console.log(`[Webhook] Processing payload: object=${payload.object}, entries=${payload.entry?.length}`);
+
+  if (payload.object !== "page") {
+    console.log(`[Webhook] Skipping — object is "${payload.object}", expected "page"`);
+    return;
+  }
 
   for (const entry of payload.entry) {
     for (const change of entry.changes) {
