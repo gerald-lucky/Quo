@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Bad Request", { status: 400 });
   }
 
-  // Facebook requires a 200 response quickly; process async
-  processLeadEvents(payload).catch((err) =>
+  // Process synchronously — Vercel serverless stops execution after response
+  await processLeadEvents(payload).catch((err) =>
     console.error("[Webhook] processLeadEvents error:", err)
   );
 
